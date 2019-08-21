@@ -1,0 +1,11 @@
+- Name: stereoSlamOrb
+  Type: StereoSlam
+  Implementation: StereoSlamOrb
+  Parameters:
+  - Name: GeneralParameters
+    SettingsPath: "../rsrc/StereoSlamOrbSettings.yaml"
+    VocabularyPath: "../rsrc/ORBvoc.bin"
+    EnableViewer: false
+    SaveMap: false
+    MapFile: ""
+

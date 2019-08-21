@@ -1,0 +1,6 @@
+- SaveMap: false
+  SettingsPath: !<!> ../rsrc/StereoSlamOrbSettings.yaml
+  Name: GeneralParameters
+  VocabularyPath: !<!> ../rsrc/ORBvoc.bin
+  MapFile: !<!> ""
+  EnableViewer: false
