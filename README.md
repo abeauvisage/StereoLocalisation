@@ -1,18 +1,21 @@
 # StereoLocalisation
 Testing various VO/SLAM algorithms
 
-# Dependencies
+## Dependencies
 - OpenCV 3 minimum (https://opencv.org/releases/)
-- yaml-cpp
 - CDFF project (https://gitlab.com/h2020src/og3/cdff)
-- Pangolin (installed with ROS)
+- yaml-cpp (included in CDFF)
+- Pangolin (included in CDFF, but make sure it is downloaded before compiling CDFF)
+- DBow2, g2o and libORBSLAM2 (part of CDFF, make sure it is compiled)
 - libviso2 (https://github.com/srv/viso2)
 - uasl_motion_estimation (https://github.com/abeauvisage/uasl_motion_estimation)
 - uasl_vins_fusion (https://github.com/abeauvisage/uasl_VINS_fusion)
 
-# Installation
+## Installation
 
-Before installing, run make install  in CDFF projetc and copy rsrc/share dir to CDFF_ROOT_DIR/install
+**Since CDFF script is incomplete, before installing:**
+- run make install in CDFF project and copy rsrc/share dir to CDFF_ROOT_DIR/install
+- move libs DBow2 and g2o from build/Common/Core/modules/MODULENAME/lib to build/Common/Core/modules
 
 In root directory:
 
