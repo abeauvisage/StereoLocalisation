@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.1)
+cmake_minimum_required(VERSION 3.5)
 project(stereo_localisation)
 set(CMAKE_BUILD_TYPE "Release" CACHE STRING "build type")
 set(CMAKE_CXX_STANDARD 11)
@@ -26,15 +26,16 @@ set(CMAKE_MODULE_PATH "${CDFF_ROOT_DIR}/${BUNDLED_DEPENDENCIES_PREFIX}/share/cma
 
 #finding necessary libraries to run VisualSlam and StereoMotionEstimation
 find_package(MotionEstimation REQUIRED PATHS /home/abeauvisage/Documents/uasl_VINS_fusion/uasl_motion_estimation/share/MotionEstimation)
-find_package(OpenCV 3 REQUIRED)
-find_package(yaml-cpp REQUIRED)
+find_package(OpenCV 3 REQUIRED ${OPENCV_CONFIG_FILE})
+find_package(yaml-cpp REQUIRED ${YAML_CPP_CONFIG_FILE})
 find_package(CDFF REQUIRED PATHS ${CDFF_INSTALL}/share/cmake) #find only a tiny portion of CDFF libraries because install script is incomplete
-find_package(Pangolin REQUIRED)
-find_package(LIBORBSLAM REQUIRED ${CDFF_ROOT_DIR}/build/Common/Core/liborbslam/)
+find_package(Pangolin REQUIRED ${PANGOLIN_CONFIG_FILE})
+find_package(LIBORBSLAM REQUIRED PATHS ${CDFF_ROOT_DIR}/build/Common/Core/liborbslam/)
 find_package(DBoW2 REQUIRED PATHS ${CDFF_ROOT_DIR}/build/Common/Core/liborbslam/modules)
 find_package(g2o REQUIRED PATHS ${CDFF_ROOT_DIR}/build/Common/Core/liborbslam/modules)
 
-find_package(libviso2 PATHS /home/abeauvisage/catkin_ws/devel/share/libviso2/cmake)
+set(LIBVISO_DIR "/home/abeauvisage/catkin_ws/devel/share/libviso2/cmake")
+find_package(libviso2 PATHS ${LIBVISO_DIR})
 
 set(COMMON_LIBRARIES ${YAML_CPP_LIBRARIES} ${MotionEstimation_LIBRARIES} ${OpenCV_LIBRARIES})
 
@@ -67,12 +68,11 @@ add_executable(stereo_dfpc_slam_test src/main_visualslam.cpp include/asnconversi
 target_link_libraries(stereo_dfpc_slam_test ${DFPC_SLAM} ${Edres-Wrapper_LIBRARIES} ${CDFF_LIBRARIES} ${COMMON_LIBRARIES})
 
 # test feature tracking
-message(STATUS "TRacking libs: ${TRACKING_LIBRARIES}")
-if(Ceres_FOUND)
+if(TRACKING_LIBRARIES AND Ceres_FOUND)
 message(STATUS "found Ceres. Adding stereo_tracking_test executable")
 add_executable(stereo_tracking_test src/main_tracking.cpp)
 target_link_libraries(stereo_tracking_test pthread ${TRACKING_LIBRARIES} ${CERES_LIBRARIES} ${COMMON_LIBRARIES})
-endif(Ceres_FOUND)
+endif(TRACKING_LIBRARIES AND Ceres_FOUND)
 
 
 #test libviso
