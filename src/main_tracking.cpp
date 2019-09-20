@@ -38,13 +38,13 @@ int main(int argc, char *argv[])
     openLogFile("poses_tracking.csv");
     writeLogFile("#timestamp,p_x,p_y,p_z,r_x,r_y,r_z,gt_p_x,gt_p_y,gt_p_z,gt_r_x,gt_r_y,gt_r_z\n");
     // Helper object to read groundtruth from tf file
-    GTReader gt_reader(dataset_info.dir+"/../../GT/tf_data.csv");
+    GTReader gt_reader(dataset_info.gt_filename);
     assert(gt_reader.stream.is_open());
     // ignore first two lines of the file (does not contain data)
     gt_reader.readHeader();
     gt_reader.readHeader();
     // helper object to load images easily
-    ImageReader img_reader;
+    ImageReader img_reader(dataset_info.image_filename,ImageReader::Type::IMAGES);
     cv_sig_handler sig_handler;
 
     //load first images
@@ -71,11 +71,12 @@ int main(int argc, char *argv[])
     graph.addLegend("BA",2);
 
     /** MotionEstimation **/
-    Quatd world_to_cv{(Mat_<double>(3,3) << 0,0,1,-1,0,0,0,-1,0)}; // conversion from standard world coordinate system to opencv
-    CamPose_qd pose_base_to_camera{0,world_to_cv * Euld(-0.7,0,0).getQuat(),{0.675,0.035,0.13}};
-    cout << "pose base cam" << pose_base_to_camera <<endl;
-    //initialising current_camera_pose with ground truth (the pose is expressed int the world frame)
-    CamPose_qd current_camera_pose = (gt_reader.readPoseLine().second*pose_base_to_camera).inv();
+    CamPose_qd pose_base_to_camera{0,dataset_info.q_cam_to_base,dataset_info.p_cam_to_base};
+    pair<int64_t,CamPose_qd> gt_pose = gt_reader.readPoseLine();
+    while(gt_pose.first < img_reader.img_stamp)
+		gt_pose = gt_reader.readPoseLine();
+    //initialising current_camera_pose with ground truth (the pose is expressed in the world frame)
+    CamPose_qd current_camera_pose = (gt_pose.second*pose_base_to_camera).inv();
 
     cout << "initial pose: " << current_camera_pose.inv().orientation << current_camera_pose.inv().position << endl;
 
@@ -90,11 +91,10 @@ int main(int argc, char *argv[])
         auto reading_tp = chrono::steady_clock::now();
 
         //reading current pose from ground truth reader and plotting
-        pair<int64_t,CamPose_qd> gt;
         do{
-            gt = gt_reader.readPoseLine();
-        }while(gt.first && gt.first < img_reader.img_stamp);
-        graph.addValue(Point2d{-gt.second.position[1],gt.second.position[0]},1);
+            gt_pose = gt_reader.readPoseLine();
+        }while(gt_pose.first && gt_pose.first < img_reader.img_stamp);
+        graph.addValue(Point2d{-gt_pose.second.position[1],gt_pose.second.position[0]},1);
 
         //tracking features
         tracking::StereoWindowTracker::TRACKING_RESULT result;
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
         if(!tracker.is_tracking_ok()){
             cerr << "[Tracking] tracking failed. resetting..." << endl;
             CamPose_qd current_vehicle_pose = current_camera_pose.inv() * pose_base_to_camera.inv();
-            logFile << gt.first << current_vehicle_pose.position << current_vehicle_pose.orientation.getEuler().getVector() << gt.second.position << gt.second.orientation.getEuler().getVector() << endl;
+            logFile << gt_pose.first << current_vehicle_pose.position << current_vehicle_pose.orientation.getEuler().getVector() << gt_pose.second.position << gt_pose.second.orientation.getEuler().getVector() << endl;
             graph.addValue(Point2d{-current_vehicle_pose.position(1),current_vehicle_pose.position(0)},2);
             tracker.resetTracker(current_imgs);
             continue;
@@ -135,7 +135,7 @@ int main(int argc, char *argv[])
         // converts from the current camera pose to the current vehicle pose
         CamPose_qd current_vehicle_pose = current_camera_pose.inv() * pose_base_to_camera.inv();
         //saves vehicle's pose and ground truth in log file and plot trajectories
-        logFile << gt.first << current_vehicle_pose.position << current_vehicle_pose.orientation.getEuler().getVector() << gt.second.position << gt.second.orientation.getEuler().getVector() << endl;
+        logFile << gt_pose.first << current_vehicle_pose.position << current_vehicle_pose.orientation.getEuler().getVector() << gt_pose.second.position << gt_pose.second.orientation.getEuler().getVector() << endl;
         graph.addValue(Point2d{-current_vehicle_pose.position(1),current_vehicle_pose.position(0)},2);
 
         auto stop_tp = chrono::steady_clock::now();

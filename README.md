@@ -30,7 +30,7 @@ In root directory:
 
 > LIBVISO_DIR and TRACKING_DIR are optional
 
-> specify -DOPENCV_CONFIG_ UASL_MOTION_ESTIMATION_CONFIG_FILE or YAML_CPP_CONFIG_PATH if necessary
+> specify -DOPENCV_CONFIG_PATH UASL_MOTION_ESTIMATION_CONFIG_PATH or YAML_CPP_CONFIG_PATH if necessary
 
 4. compile:
 - make
