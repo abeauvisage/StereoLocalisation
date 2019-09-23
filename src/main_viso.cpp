@@ -5,7 +5,7 @@
 #include <gui/Graph2D.h>
 
 #include <chrono>
-
+#include <numeric>
 
 using namespace std;
 using namespace me;
@@ -28,14 +28,17 @@ int main(int argc, char *argv[])
     }
 
     /** initialisation **/
+    // log file saving camera poses
     openLogFile("poses_viso.csv");
     writeLogFile("#timestamp,p_x,p_y,p_z,r_x,r_y,r_z,gt_p_x,gt_p_y,gt_p_z,gt_r_x,gt_r_y,gt_r_z\n");
-    GTReader gt_reader(dataset_info.dir+"/../../GT/tf_data.csv");
+    // Helper object to read groundtruth from tf file
+    GTReader gt_reader(dataset_info.gt_filename);
     assert(gt_reader.stream.is_open());
+    // ignore first two lines of the file (does not contain data)
     gt_reader.readHeader();
     gt_reader.readHeader();
-
-    ImageReader img_reader;
+	// helper object to load images easily
+    ImageReader img_reader(dataset_info.image_filename,ImageReader::Type::IMAGES);
     cv_sig_handler sig_handler;
 
     /** display **/
@@ -44,6 +47,7 @@ int main(int argc, char *argv[])
     namedWindow("img_right",0);
     Graph2D graph("trajectory",2,true);
 
+    // load first images
     pair<Mat,Mat> current_imgs = img_reader.readStereo();
     if(current_imgs.first.empty() || current_imgs.second.empty()){
         cerr << "One of the images is empty! exiting..." << endl;
@@ -65,14 +69,16 @@ int main(int argc, char *argv[])
     viso.process(current_imgs.first.ptr<uint8_t>(),current_imgs.second.ptr<uint8_t>(),dims);
 
     /** main loop **/
-    Quatd world_to_cv{(Mat_<double>(3,3) << 0,0,1,-1,0,0,0,-1,0)}; // conversion from standard world coordinat frame to opencv
-    CamPose_qd pose_base_to_camera{0,world_to_cv * Euld(-0.7,0,0).getQuat(),{0.675,0.35,0.13}};
-//    CamPose_qd pose_base_to_camera{};
+    CamPose_qd pose_base_to_camera{0,dataset_info.q_cam_to_base,dataset_info.p_cam_to_base};
+    pair<int64_t,CamPose_qd> gt_pose = gt_reader.readPoseLine();
+    while(gt_pose.first < img_reader.img_stamp)
+		gt_pose = gt_reader.readPoseLine();
 
     vector<double> ori_err,pos_err;
-    CamPose_qd initial_pose = (gt_reader.readPoseLine().second*pose_base_to_camera).inv();
+    CamPose_qd initial_pose = (gt_pose.second*pose_base_to_camera).inv();
     Mat current_pose = (Mat) initial_pose.TrMat();
-    cout << "initial pose: " << initial_pose.inv().orientation << endl;
+    cout << "initial pose: " << initial_pose.inv().orientation << initial_pose.inv().position << endl;
+
     for(;;){
         cout << "##### image " << img_reader.get_img_nb()  << " ####" << endl;
         auto start_tp = chrono::steady_clock::now();

@@ -1,0 +1,7 @@
+- Name: GeneralParameters
+  SettingsPath: "../rsrc/StereoSlamOrbSettings_kesskess.yaml"
+  VocabularyPath: "../rsrc/ORBvoc.bin"
+  EnableViewer: false
+  SaveMap: false
+  MapFile: ""
+

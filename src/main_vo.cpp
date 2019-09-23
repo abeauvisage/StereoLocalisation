@@ -34,13 +34,14 @@ int main(int argc, char *argv[])
     }
 
     /** initialisation **/
-
-    GTReader gt_reader(dataset_info.dir+"/../../GT/tf_data.csv");
+	// Helper object to read groundtruth from tf file
+    GTReader gt_reader(dataset_info.gt_filename);
     assert(gt_reader.stream.is_open());
+    // ignore first two lines of the file (does not contain d
     gt_reader.readHeader();
     gt_reader.readHeader();
-
-    ImageReader img_reader;
+	// helper object to load images easily
+    ImageReader img_reader(dataset_info.image_filename,ImageReader::Type::IMAGES);
     cv_sig_handler sig_handler;
 
     /** display **/
@@ -49,6 +50,7 @@ int main(int argc, char *argv[])
     namedWindow("img_right",0);
     Graph2D graph("trajectory",2,true);
 
+	//load first images
     pair<Mat,Mat> current_imgs = img_reader.readStereo();
     if(current_imgs.first.empty() || current_imgs.second.empty()){
         cerr << "One of the images is empty! exiting..." << endl;

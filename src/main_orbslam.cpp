@@ -42,14 +42,17 @@ int main(int argc, char *argv[])
     }
 
     /** initialisation **/
+    // log file saving camera poses
     openLogFile("poses_slam.csv");
     writeLogFile("#timestamp,p_x,p_y,p_z,r_x,r_y,r_z,gt_p_x,gt_p_y,gt_p_z,gt_r_x,gt_r_y,gt_r_z\n");
-    GTReader gt_reader(dataset_info.dir+"/../../GT/tf_data.csv");
+    // Helper object to read groundtruth from tf file
+    GTReader gt_reader(dataset_info.gt_filename);
     assert(gt_reader.stream.is_open());
+    // ignore first two lines of the file (does not contain data)
     gt_reader.readHeader();
     gt_reader.readHeader();
-
-    ImageReader img_reader;
+    // helper object to load images easily
+    ImageReader img_reader(dataset_info.image_filename,ImageReader::Type::IMAGES);
     cv_sig_handler sig_handler;
 
     /** display **/
@@ -58,6 +61,7 @@ int main(int argc, char *argv[])
     namedWindow("img_right",0);
     Graph2D graph("trajectory",2,true);
 
+    //load first images
     pair<Mat,Mat> current_imgs = img_reader.readStereo();
     if(current_imgs.first.empty() || current_imgs.second.empty()){
         cerr << "One of the images is empty! exiting..." << endl;
@@ -65,9 +69,14 @@ int main(int argc, char *argv[])
     }
 
     /** MotionEstimation Classes **/
-    Quatd world_to_cv{(Mat_<double>(3,3) << 0,0,1,-1,0,0,0,-1,0)}; // conversion from standard world coordinat frame to opencv
-    CamPose_qd pose_base_to_camera{0,world_to_cv * Euld(-0.7,0,0).getQuat(),{0.675,0.35,0.13}};
-    CamPose_qd initial_pose = gt_reader.readPoseLine().second;
+    CamPose_qd pose_base_to_camera{0,dataset_info.q_cam_to_base,dataset_info.p_cam_to_base};
+    pair<int64_t,CamPose_qd> gt_pose = gt_reader.readPoseLine();
+    while(gt_pose.first < img_reader.img_stamp)
+		gt_pose = gt_reader.readPoseLine();
+    //initialising current_camera_pose with ground truth (the pose is expressed in the world frame)
+    CamPose_qd initial_pose = (gt_pose.second*pose_base_to_camera);
+    cout << "config file: " << argv[2] << endl;
+
     unique_ptr<StereoSLAM> estimatorSLAM {new StereoSLAM()};
     estimatorSLAM->setConfigurationFile(argv[2]);
     estimatorSLAM->configure();
@@ -94,10 +103,10 @@ int main(int argc, char *argv[])
         auto reading_tp = chrono::steady_clock::now();
         pair<int64_t,CamPose_qd> gt;
         do{
-            gt = gt_reader.readPoseLine();
-        }while(gt.first < img_reader.img_stamp);
+            gt_pose = gt_reader.readPoseLine();
+        }while(gt_pose.first < img_reader.img_stamp);
 
-        graph.addValue(Point2d{-gt.second.position[1],gt.second.position[0]},1);
+        graph.addValue(Point2d{-gt_pose.second.position[1],gt_pose.second.position[0]},1);
 
         current_pair = GenerateStereoPair(current_imgs);
         estimatorSLAM->framePairInput(*current_pair);
@@ -105,8 +114,8 @@ int main(int argc, char *argv[])
         const asn1SccTransformWithCovariance& outputSLAM_ = estimatorSLAM->poseOutput();
         Vec3d tr_(outputSLAM_.data.translation.arr);
         Vec4d qt_(outputSLAM_.data.orientation.arr);
-        CamPose_qd current_pose = initial_pose * CamPose_qd(0,Quatd{qt_(3),qt_(0),qt_(1),qt_(2)},tr_);
-        logFile << gt.first << current_pose.position << current_pose.orientation.getEuler().getVector() << gt.second.position << gt.second.orientation.getEuler().getVector() << endl;
+        CamPose_qd current_pose = initial_pose * CamPose_qd(0,Quatd{qt_(3),qt_(0),qt_(1),qt_(2)},tr_) * pose_base_to_camera.inv();
+        logFile << gt_pose.first << current_pose.position << current_pose.orientation.getEuler().getVector() << gt_pose.second.position << gt_pose.second.orientation.getEuler().getVector() << endl;
         cout << "translation tr "<< tr_ << qt_ << endl;
         cout << "current position: " << current_pose.position << endl;
 
@@ -114,8 +123,8 @@ int main(int argc, char *argv[])
         cout << "reading: " << chrono::duration_cast<chrono::milliseconds>(reading_tp-start_tp).count() << "ms." << endl;
         cout << "processing: " << chrono::duration_cast<chrono::milliseconds>(processing_tp-reading_tp).count() << "ms." << endl;
 
-        ori_err.push_back(norm(gt.second.orientation.getEuler().getVector()-current_pose.orientation.getEuler().getVector()));
-        pos_err.push_back(norm(gt.second.position-current_pose.position));
+        ori_err.push_back(norm(gt_pose.second.orientation.getEuler().getVector()-current_pose.orientation.getEuler().getVector()));
+        pos_err.push_back(norm(gt_pose.second.position-current_pose.position));
         graph.addValue(Point2d{-current_pose.position(1),current_pose.position(0)},2);
         imshow("img_left",current_imgs.first);imshow("img_right",current_imgs.second);
         resizeWindow("img_left",640,480);resizeWindow("img_right",640,480);
